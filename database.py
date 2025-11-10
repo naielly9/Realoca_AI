@@ -1,4 +1,5 @@
 import sqlite3
+import pandas as pd
 
 class Database:
     def __init__(self, db_path="realoca_ai.db"):
@@ -8,6 +9,23 @@ class Database:
     def conectar(self):
         return sqlite3.connect(self.db_path)
 
+    def execute(self, query, params=(), fetchone=False, fetchall=False, commit=False):
+        conn = self.conectar()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+
+        result = None
+        if fetchone:
+            result = cursor.fetchone()
+        elif fetchall:
+            result = cursor.fetchall()
+
+        if commit:
+            conn.commit()
+
+        conn.close()
+        return result
+    
     def criar_tabelas(self):
         conn = self.conectar()
         cursor = conn.cursor()
@@ -109,6 +127,8 @@ class Database:
                 nome TEXT NOT NULL,
                 id_endereco INTEGER,
                 id_filial INTEGER,
+                mt TEXT UNIQUE,            
+                centro_custo TEXT, 
                 ativo INTEGER DEFAULT 1,
                 FOREIGN KEY (id_endereco) REFERENCES enderecos (id),
                 FOREIGN KEY (id_filial) REFERENCES filiais (id)
@@ -119,12 +139,13 @@ class Database:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS rotas_bairro (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_bairro INTEGER,
-                id_filial INTEGER,
-                id_linha INTEGER,
+                id_bairro INTEGER NOT NULL,              -- Bairro de origem (do funcionário)
+                id_filial INTEGER NOT NULL,              -- Filial de destino
+                id_linha INTEGER,                        -- Linha de transporte utilizada
                 distancia_km REAL,
                 tempo_estimado_min INTEGER,
                 custo_estimado REAL,
+                ordem INTEGER,                           -- 1ª, 2ª ou 3ª melhor rota
                 FOREIGN KEY (id_bairro) REFERENCES bairros (id),
                 FOREIGN KEY (id_filial) REFERENCES filiais (id),
                 FOREIGN KEY (id_linha) REFERENCES linhas (id)
@@ -133,8 +154,8 @@ class Database:
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_func_endereco ON funcionarios(id_endereco)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_func_filial ON funcionarios(id_filial)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rota_bairro ON rotas_bairro(id_bairro)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rota_linha ON rotas_bairro(id_linha)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rotas_bairro_bairro ON rotas_bairro(id_bairro)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rotas_bairro_filial ON rotas_bairro(id_filial)")
 
 
         conn.commit()
@@ -166,8 +187,7 @@ class Database:
         cursor.execute("SELECT id FROM cidades WHERE nome=?", (nome,))
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else None
-   
+        return result[0] if result else None  
     def get_or_create_estado(self, nome, sigla):
         conn = self.conectar()
         cursor = conn.cursor()
@@ -258,12 +278,119 @@ class Database:
         conn.close()
         return tipo_id
     
-    def cadastrar_funcionario(self, nome, id_endereco, id_filial):
+    def cadastrar_funcionario(self, nome, id_endereco, id_filial, mt=None, centro_custo=None):
         conn = self.conectar()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO funcionarios (nome, id_endereco, id_filial)
-            VALUES (?, ?, ?)
-        """, (nome, id_endereco, id_filial))
+        INSERT INTO funcionarios (nome, id_endereco, id_filial, mt, centro_custo)
+        VALUES (?, ?, ?, ?, ?)
+    """, (nome, id_endereco, id_filial, mt, centro_custo))
         conn.commit()
+        conn.close()
+
+    def get_or_create_funcionario(self, nome, id_endereco, id_filial, mt=None, centro_custo=None):
+        conn = self.conectar()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id FROM funcionarios WHERE mt = ?
+        """, (mt,))
+        resultado = cursor.fetchone()
+
+        if resultado:
+            funcionario_id = resultado[0]
+            cursor.execute("""
+                UPDATE funcionarios
+                SET id_endereco = ?, id_filial = ?, centro_custo = ?, nome = ?
+                WHERE id = ?
+            """, (id_endereco, id_filial, centro_custo, nome, funcionario_id))
+            conn.commit()
+            conn.close()
+            return funcionario_id 
+        
+        cursor.execute("""
+            INSERT INTO funcionarios (nome, id_endereco, id_filial, mt, centro_custo)
+            VALUES (?, ?, ?, ?, ?)
+        """, (nome, id_endereco, id_filial, mt, centro_custo))
+        conn.commit()
+
+        funcionario_id = cursor.lastrowid
+        conn.close()
+        return funcionario_id
+
+    def get_funcionarios_por_mt(self, lista_mt):
+        conn = self.conectar()
+        cursor = conn.cursor()
+
+        placeholders = ', '.join(['?'] * len(lista_mt))
+
+        query = f"""
+            SELECT f.id, f.nome,f.id_endereco,f.id_filial,f.mt,f.centro_custo
+            FROM funcionarios f
+            JOIN enderecos e ON f.id_endereco = e.id
+            JOIN filiais fi ON f.id_filial = fi.id
+            WHERE f.mt IN ({placeholders}) AND f.ativo = 1
+        """
+
+        cursor.execute(query, lista_mt)
+        rows = cursor.fetchall()
+
+        conn.close()
+        return rows
+    
+    def get_filiais(self) -> pd.DataFrame:
+        """Retorna todas as filiais com latitude, longitude e cidade."""
+        conn = self.conectar()
+        query = """
+            SELECT f.id, f.nome_filial, e.latitude, e.longitude, c.nome AS cidade
+            FROM filiais f
+            JOIN enderecos e ON f.id_endereco = e.id
+            JOIN bairros b ON e.id_bairro = b.id
+            JOIN cidades c ON c.id = b.cidade_id
+        """
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        return df
+
+    def get_funcionarios(self) -> pd.DataFrame:
+        """Retorna todos os funcionários com endereço, filial e cidade."""
+        conn = self.conectar()
+        query = """
+            SELECT func.id, func.nome, func.ativo, func.centro_custo, func.mt,
+                   f.nome_filial, e.latitude, e.longitude, c.nome AS cidade
+            FROM funcionarios func
+            LEFT JOIN filiais f ON f.id = func.id_filial
+            LEFT JOIN enderecos e ON e.id = func.id_endereco
+            LEFT JOIN bairros b ON b.id = e.id_bairro
+            LEFT JOIN cidades c ON c.id = b.cidade_id
+        """
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        return df
+    def deletar_funcionarios_sem_filial(self):
+        """Deleta todos os funcionários que não possuem filial associada."""
+        conn = self.conectar()
+        cursor = conn.cursor()
+
+        # Primeiro, exibe quantos serão removidos (para controle)
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM funcionarios 
+            WHERE id_filial IS NULL
+            OR id_filial NOT IN (SELECT id FROM filiais);
+        """)
+        qtd = cursor.fetchone()[0]
+
+        if qtd > 0:
+            # Executa o delete
+            cursor.execute("""
+                DELETE FROM funcionarios
+                WHERE id_filial IS NULL
+                OR id_filial NOT IN (SELECT id FROM filiais);
+            """)
+            conn.commit()
+            print(f"✅ {qtd} funcionário(s) sem filial foram deletados com sucesso.")
+        else:
+            print("ℹ️ Nenhum funcionário sem filial encontrado.")
+
         conn.close()

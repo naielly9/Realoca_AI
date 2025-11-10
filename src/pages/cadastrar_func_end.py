@@ -60,7 +60,9 @@ def mostrar_tela_cadastro_enderecos(db):
                 cep = str(row.get("CEP") or row.get("Cep")).replace("-", "").strip()
                 logradouro = str(row.get("ENDERECO") or row.get("Endereço")).strip()
                 numero = str(row.get("Num.Endereço") or "").strip()
-                
+                mt = str(row.get("MT") or "").strip()
+                centro_custo = str(row.get("C CUSTO") or row.get("CENTRO CUSTO") or "").strip()
+
                 estado_id = db.get_or_create_estado(estado, estado)
                 cidade_id = db.get_or_create_cidade(municipio, estado_id)
                 bairro_id = db.get_or_create_bairro(bairro, cidade_id)
@@ -73,7 +75,10 @@ def mostrar_tela_cadastro_enderecos(db):
                 else:
                     nome_func = str(row.get("NOME") or f"Funcionario_{row.get('ID')}").strip()
                     id_filial = str(row.get("FILIAL") or "").strip()
-                    db.cadastrar_funcionario(nome_func, endereco_id, id_filial)
+                    mt = str(row.get("MT") or "").strip()
+                    centro_custo = str(row.get("C CUSTO") or row.get("CENTRO CUSTO") or "").strip()
+
+                    db.get_or_create_funcionario(nome_func, endereco_id, id_filial, mt, centro_custo)
                     inseridos["funcionarios"] += 1
 
             st.success("✅ Cadastro concluído!")

@@ -27,7 +27,7 @@ def mostrar_tela_principal():
     if st.session_state["page"] == "usuario":
         mostrar_tela_cadastro()
     elif st.session_state["page"] == "analises":
-        st.title("Tela de Análises")
+        mostrar_tela_analises(db)
     elif st.session_state["page"] == "transporte":
         mostrar_tela_custo_transporte()
     elif st.session_state["page"] == "funcionarios":
