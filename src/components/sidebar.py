@@ -174,7 +174,7 @@ def sidebar_menu():
                 if st.button(label, key=key, use_container_width=True):
                     st.session_state["page"] = page_value
                     
-            styled_menu_button("btn_analises", "analytics", "Análises", "analises")
+            styled_menu_button("btn_analises", "analytics", "Gestão por Dados", "analises")
             styled_menu_button("btn_user", "person_add", "Cadastro de Usuário", "usuario")
             styled_menu_button("btn_func", "group", "Cadastro de Fúncionarios e Filiais", "funcionarios")
             styled_menu_button("btn_transporte", "local_shipping", "Custo de Transporte", "transporte")

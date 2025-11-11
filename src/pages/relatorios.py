@@ -7,23 +7,52 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from src.components.indicador_card import indicador_card
 from src.components.summary_card import create_summary_card
-def mostrar_tela_analises(db):
+from src.components.grafico_barras import criar_grafico_barras
+from streamlit_option_menu import option_menu
 
-    st.title("📊 Dashboard de Realocação de Funcionários")
+def mostrar_tela_analises(db):
+    st.title("Gestão de Deslocamento e Filiais")
     db.deletar_funcionarios_sem_filial()
     df_filiais = db.get_filiais()
     df_func = db.get_funcionarios()
 
-    tab1, tab2, tab3 = st.tabs(["🧭 Realocação e Mobilidade", "🏢 Filiais e Cobertura", "👥 Funcionários"])
-    st.markdown("""
+    st.markdown(
+        """
         <style>
-            .main-container {
-                padding: 1rem 2rem;
-            }
+        .menu-container {
+            position: sticky;
+            top: 0;
+            background-color: white;
+            z-index: 999;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            width: 100%;
+            left: 0;
+            margin: 0;
+        }
+        .block-container {
+            padding-left: 0rem;
+            padding-right: 0rem;
+        }
+        .menu-container .nav.nav-pills {
+            justify-content: space-around;
+            width: 100%;
+        }
         </style>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
+    tab_titles = ["Realocação e Mobilidade", "Filiais e Cobertura", "Funcionários"]
 
-    with tab1:
+    aba_ativa = option_menu(
+        menu_title=None,
+        options=tab_titles,
+        icons=["geo-alt", "building", "people-fill"],
+        orientation="horizontal",
+        default_index=0,
+    )
+
+    if aba_ativa == "Realocação e Mobilidade":
         total_funcionarios = len(df_func)
         total_filiais = len(df_filiais)
         ativos = df_func['ativo'].sum()
@@ -85,52 +114,11 @@ def mostrar_tela_analises(db):
         else:
             st.warning("Não há dados suficientes para gerar o mapa.")
 
-        
-
-    with tab2:
+    elif aba_ativa == "Filiais e Cobertura":
         st.markdown("")
         if not df_filiais.empty:
             df_filiais = df_filiais.sort_values(by="cidade")
              
-            def criar_grafico_filiais(df):
-                df_cidades = df["cidade"].value_counts().reset_index()
-                df_cidades.columns = ["Cidade", "Quantidade de Filiais"]
-
-                fig = go.Figure()
-                fig.add_trace(go.Bar(
-                    x=df_cidades["Cidade"],
-                    y=df_cidades["Quantidade de Filiais"],
-                    marker_color="#004080",
-                    text=df_cidades["Quantidade de Filiais"],
-                    textposition="auto",
-                    hoverinfo="text",
-                    hovertext=[f"Cidade: {c}<br>Filiais: {q}" for c, q in zip(df_cidades["Cidade"], df_cidades["Quantidade de Filiais"])]
-                ))
-
-                fig.update_layout(
-                    title=dict(
-                        text="<b>Distribuição de Filiais por Cidade</b>",
-                        x=0.5,
-                        xanchor="center",
-                        font=dict(size=16, family="Arial", color="black")
-                    ),
-                    xaxis_title="Cidade",
-                    yaxis_title="Quantidade de Filiais",
-                    xaxis=dict(
-                        tickangle=0,
-                        tickfont=dict(size=12, family="Arial")
-                    ),
-                    yaxis=dict(
-                        tickfont=dict(size=12, family="Arial"),
-                        dtick=1
-                    ),
-                    plot_bgcolor="white",
-                    hoverlabel=dict(bgcolor="#497CAF", font_size=12, font_color="white"),
-                    margin=dict(l=50, r=30, t=80, b=50)
-                )
-
-                return fig
-           
             cols_per_row = 4
             for i in range(0, len(df_filiais), cols_per_row):
                 cols = st.columns(cols_per_row)
@@ -145,21 +133,28 @@ def mostrar_tela_analises(db):
                         )
 
                 st.markdown("")
-            fig = criar_grafico_filiais(df_filiais)
-            st.plotly_chart(fig, use_container_width=True)
+            fig_filiais = criar_grafico_barras(df_filiais, "cidade", "Distribuição de Filiais por Cidade", cor="#004080")
+            if fig_filiais:
+                st.plotly_chart(fig_filiais, use_container_width=True)
             st.map(df_filiais[['latitude', 'longitude']])     
         else:
             st.info("Nenhuma filial cadastrada no momento.")
 
-    with tab3:
-        st.subheader("👥 Funcionários por Centro de Custo")
+    elif aba_ativa == "Funcionários":
         if not df_func.empty:
-            st.bar_chart(df_func['centro_custo'].value_counts())
+            df_func["centro_custo"] = df_func["centro_custo"].astype(str).str.strip()
+            col1, col2 = st.columns([2, 1])
 
-            st.divider()
-            st.subheader("📋 Lista de Funcionários")
-            filtro_cidade = st.selectbox("Filtrar por cidade:", ["Todos"] + sorted(df_func['cidade'].dropna().unique().tolist()))
-            filtro_status = st.radio("Status", ["Todos", "Ativos", "Inativos"], horizontal=True)
+            with col1:
+                filtro_cidade = st.selectbox(
+                    "Filtrar por cidade:",
+                    ["Todos"] + sorted(df_func['cidade'].dropna().unique().tolist()))
+
+            with col2:
+                filtro_status = st.selectbox(
+                    "Status:",
+                    ["Todos", "Ativos", "Inativos"]
+                )
 
             df_filtered = df_func.copy()
             if filtro_cidade != "Todos":
@@ -170,18 +165,22 @@ def mostrar_tela_analises(db):
                 df_filtered = df_filtered[df_filtered['ativo'] == 0]
 
             st.dataframe(
-                df_filtered[['nome', 'mt', 'centro_custo', 'nome_filial', 'cidade', 'ativo']].rename(
-                    columns={
-                        'nome': 'Nome',
-                        'mt': 'Matrícula',
-                        'centro_custo': 'Centro de Custo',
-                        'nome_filial': 'Filial',
-                        'cidade': 'Cidade',
-                        'ativo': 'Ativo'
-                    }
-                ),
+                df_filtered[['nome', 'mt', 'centro_custo', 'nome_filial', 'cidade', 'ativo']]
+                .rename(columns={
+                    'nome': 'Nome',
+                    'mt': 'Matrícula',
+                    'centro_custo': 'Centro de Custo',
+                    'nome_filial': 'Filial',
+                    'cidade': 'Cidade',
+                    'ativo': 'Ativo'
+                }),
+                hide_index=True,
                 use_container_width=True
             )
 
+
+            st.divider()
+            fig_func = criar_grafico_barras(df_func, "centro_custo", "Funcionários por Centro de Custo", cor="#0066CC") 
+            st.plotly_chart(fig_func, use_container_width=True)
         else:
             st.warning("Nenhum funcionário cadastrado.")
