@@ -180,7 +180,7 @@ def mostrar_tela_analises(db):
 
 
             st.divider()
-            fig_func = criar_grafico_barras(df_func, "centro_custo", "Funcionários por Centro de Custo", cor="#0066CC") 
+            fig_func = criar_grafico_barras(df_func, "centro_custo", "Funcionários por Centro de Custo", cor="#004080") 
             st.plotly_chart(fig_func, use_container_width=True)
         else:
             st.warning("Nenhum funcionário cadastrado.")

@@ -29,63 +29,96 @@ def mostrar_tela_custo_transporte():
         if "arquivo_lido" not in st.session_state:
             st.session_state.arquivo_lido = False
             st.session_state.df = pd.DataFrame()
-            st.session_state.selecoes = {}  # { MT: { 'empresa':..., 'distancia_km':..., 'reducao':... } }
-
-    def df_summary_for_display(df):
-        # cria um resumo com as colunas esperadas, preenchendo com '-' quando não existe
-        col_map = {
-            "MT": ["mt"],
-            "C CUSTO": ["c custo", "c_custo", "ccusto", "c custo"],
-            "Endereço Colaborador": ["endereco", "endereço", "endereco colaborador", "endereço colaborador"],
-            "Onde Estava Alocado": ["onde estava", "onde estava alocado", "alocado", "filial"],
-            "Antiga Distância (Destino 0)": ["destino0", "destino 0", "distancia0", "distancia 0", "antiga distancia", "antiga distância", "destino0_distancia"]
-        }
-
-        out = pd.DataFrame()
-        for out_col, keys in col_map.items():
-            col = guess_column(df, keys)
-            out[out_col] = df[col] if col else ["-"] * len(df)
-        return out
-
-    def gerar_pdf_bytes(selecoes_dict):
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
-        width, height = letter
-        y = height - 50
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, y, "Relatório de Realocações")
-        y -= 30
-        c.setFont("Helvetica", 12)
-        if not selecoes_dict:
-            c.drawString(50, y, "Nenhuma seleção realizada.")
-        else:
-            for mt, sel in selecoes_dict.items():
-                texto = f"{mt} → {sel.get('empresa','-')} | Distância: {sel.get('distancia_km','-')} km | Redução: {sel.get('reducao','-')}"
-                c.drawString(50, y, texto)
-                y -= 18
-                if y < 60:
-                    c.showPage()
-                    y = height - 50
-        c.save()
-        buffer.seek(0)
-        return buffer
+            st.session_state.selecoes = {}  
 
     ensure_session()
+    st.markdown("""
+    <style>
+    /* Container geral */
+    .main-container {
+        padding: 1rem 2rem;
+    }
 
-    # Cabeçalho
-    col1, col2, col3 = st.columns([3, 3, 2])
+    .painel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #e6e6e6;
+        padding-bottom: 0.5rem;
+    }
+
+    .titulo-pagina {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: black;
+    }
+
+    .label-custom {
+        font-size: 0.85rem;
+        color: #444;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+
+    .material-icons {
+        font-size: 1.2rem;
+        color: #004080;
+    }
+
+    section[data-testid="stFileUploader"] label div {
+        background-color: #f5f5f5;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: 0.2s;
+    }
+
+    section[data-testid="stFileUploader"] label div:hover {
+        background-color: #e0e0e0;
+        border-color: #999;
+    }
+    </style>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="painel-header">
+        <div class="titulo-pagina">
+            <span class="material-icons">swap_horiz</span>
+            <span>Realocação de Funcionários</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    col1, col2 = st.columns([3, 3])
+
     with col1:
-        st.markdown("### 👤 Usuário")
+        st.markdown(
+            "<div class='label-custom'><span class='material-icons'>person</span><b>Usuário</b></div>",
+            unsafe_allow_html=True
+        )
         st.write(st.session_state.usuario["nome"])
-    with col2:
-        st.markdown("### 🏢 Empresa")
-        #st.write(st.session_state.usuario["empresa"])
-    with col3:
-        st.markdown("### ⬆ Upload")
-        uploaded = st.file_uploader("Envie o Excel (xls/xlsx) com todos os campos", type=["xls", "xlsx"], key="uploader")
 
-    st.divider()
-    st.markdown("### 📋 Realocação")
+    with col2:
+        st.markdown(
+            "<div class='label-custom'><span class='material-icons'>upload_file</span><b>Importar Planilha</b></div>",
+            unsafe_allow_html=True
+        )
+        uploaded = st.file_uploader("Enviar arquivo Excel", type=["xls", "xlsx"], key="uploader")
+
+
+    st.markdown('</div>', unsafe_allow_html=True)
+            
     def to_excel(df, totais=None):
                     output = BytesIO()
                     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -108,7 +141,6 @@ def mostrar_tela_custo_transporte():
 
                     output.seek(0)
                     return output
-    
     
     if uploaded is not None:
         if "ultimo_upload" not in st.session_state or uploaded.name != st.session_state.ultimo_upload:
@@ -142,8 +174,7 @@ def mostrar_tela_custo_transporte():
                     st.session_state.arquivo_lido = True
                     st.session_state.ultimo_upload = uploaded.name
                     st.session_state.selecoes = {}
-                    st.success("Planilha carregada com sucesso.")
-
+             
             except Exception as ex:
                 st.error(f"Erro ao ler o Excel: {ex}")
                 st.session_state.arquivo_lido = False
@@ -280,8 +311,7 @@ def mostrar_tela_custo_transporte():
                     st.session_state["selecoes_grid"].append(selected_row)
 
         if st.session_state.get("selecoes_grid"):
-            selecoes_df = pd.DataFrame(st.session_state["selecoes_grid"])
-            print('selecoes df',selecoes_df)           
+            selecoes_df = pd.DataFrame(st.session_state["selecoes_grid"])          
             df_export = selecoes_df.copy()
 
             cols_state = getattr(grid_response, "columns_state", None) or []
@@ -296,9 +326,5 @@ def mostrar_tela_custo_transporte():
                 file_name="dados_filtrados.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-    
-    else:
-        st.info("⬆ Envie o Excel para começar a análise.")
 
     

@@ -3,29 +3,99 @@ import pandas as pd
 
 
 def mostrar_tela_cadastro_enderecos(db):
-    st.title("Cadastro de Endereços de Filiais e Funcionários")
+    st.markdown("""
+    <style>
+    .main-container {
+        padding: 1rem 2rem;
+    }
+
+    .painel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #e6e6e6;
+        padding-bottom: 0.5rem;
+    }
+
+    .titulo-pagina {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: black;
+    }
+
+    .label-custom {
+        font-size: 0.85rem;
+        color: #444;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+
+    .material-icons {
+        font-size: 1.2rem;
+        color: #004080;
+    }
+
+    section[data-testid="stFileUploader"] label div {
+        background-color: #f5f5f5;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: 0.2s;
+    }
+
+    section[data-testid="stFileUploader"] label div:hover {
+        background-color: #e0e0e0;
+        border-color: #999;
+    }
+    </style>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="painel-header">
+        <div class="titulo-pagina">
+            <span class="material-icons">location_city</span>
+            <span>Cadastro de Endereços de Filiais e Funcionários</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if "usuario" not in st.session_state:
-        st.session_state.usuario = {"nome": "Usuário Exemplo", "empresa": "Empresa Exemplo"}
+        st.session_state.usuario = {"nome": "Usuário Exemplo"}
 
     col1, col2 = st.columns([3, 3])
+
     with col1:
-        st.markdown("### 👤 Usuário")
+        st.markdown(
+            "<div class='label-custom'><span class='material-icons'>person</span><b>Usuário</b></div>",
+            unsafe_allow_html=True
+        )
         st.write(st.session_state.usuario["nome"])
+
     with col2:
-        st.markdown("### 🏢 Empresa")
-        #st.write(st.session_state.usuario["empresa"])
-
-    st.divider()
-
-    st.markdown("### 📤 Importar Planilha")
-    uploaded = st.file_uploader(
-        "Envie o Excel (xls/xlsx) com os endereços de filiais ou funcionários",
-        type=["xls", "xlsx"]
-    )
+        st.markdown(
+            "<div class='label-custom'><span class='material-icons'>upload_file</span><b>Importar Planilha</b></div>",
+            unsafe_allow_html=True
+        )
+        uploaded = st.file_uploader(
+            "Envie o arquivo Excel com os endereços de filiais ou funcionários",
+            type=["xls", "xlsx"],
+            key="upload_enderecos"
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if not uploaded:
-        st.info("Envie uma planilha para continuar.")
         return
 
     try:

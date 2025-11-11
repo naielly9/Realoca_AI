@@ -213,6 +213,5 @@ def sidebar_menu():
         
 
             if st.button(label_logout, key="btn_logout", use_container_width=True):
-                print("logout sidebar")
                 st.session_state["page"] = "logout"
                 st.rerun()
