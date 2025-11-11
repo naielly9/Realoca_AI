@@ -12,6 +12,7 @@ from src.services.realocacao_service import calcular_rotas
 import logging
 logging.basicConfig(level=logging.INFO)
 from src.services.geolocation import get_coordinates
+from src.utils.gerar_excel import to_excel
 db = Database()
 db.criar_tabelas()
 
@@ -122,29 +123,6 @@ def mostrar_tela_custo_transporte():
 
     st.markdown('</div>', unsafe_allow_html=True)
             
-    def to_excel(df, totais=None):
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                        df_to_export = df.copy()
-
-                        if totais is not None:
-                            total_row = {col: "" for col in df_to_export.columns}  
-                            for col in totais.index:
-                                if col in df_to_export.columns:
-                                    total_row[col] = totais[col]
-                            df_to_export = pd.concat(
-                                [df_to_export, pd.DataFrame([total_row])],
-                                ignore_index=True
-                            )
-
-                            first_col = df_to_export.columns[0]
-                            df_to_export.loc[df_to_export.index[-1], first_col] = "TOTAL"
-
-                        df_to_export.to_excel(writer, index=False, sheet_name="Colaboradores")
-
-                    output.seek(0)
-                    return output
-    
     if uploaded is not None:
         if "ultimo_upload" not in st.session_state or uploaded.name != st.session_state.ultimo_upload:
             try:
@@ -222,6 +200,7 @@ def mostrar_tela_custo_transporte():
                     rows.append({
                         "Colaborador": agrup,
                         "Selecionar": 'Selecionar ✅',
+                        "Matricula":row.get(mt_col,""),
                         "Centro de Custo": row.get(ccusto_col, ""),
                         "Destino Atual": row.get(destino_atual, ""),
                         "Antiga Distância": row.get(antiga_dist_col, ""),
