@@ -67,7 +67,7 @@ def get_coordinates(cep):
 
     return (None, None)
 
-if __name__ == "__main__":
+""" if __name__ == "__main__":
     with db.conectar() as conn:
         cur = conn.cursor()
         cur.execute("SELECT cep FROM enderecos WHERE latitude IS NULL OR longitude IS NULL")
@@ -79,4 +79,4 @@ if __name__ == "__main__":
         logging.info(f"🔍 {len(ceps_pendentes)} CEPs pendentes encontrados.")
         for cep in ceps_pendentes:
             coords = get_coordinates(cep)
-            logging.info(f"CEP {cep} atualizado → {coords}")
+            logging.info(f"CEP {cep} atualizado → {coords}") """

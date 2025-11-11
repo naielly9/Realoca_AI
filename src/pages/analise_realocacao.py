@@ -9,6 +9,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from database import Database
 from src.services.realocacao_service import calcular_rotas
+import logging
+logging.basicConfig(level=logging.INFO)
+from src.services.geolocation import get_coordinates
 db = Database()
 db.criar_tabelas()
 
@@ -166,6 +169,18 @@ def mostrar_tela_custo_transporte():
                         bairro_id = db.get_or_create_bairro(bairro, cidade_id)
                         endereco_id = db.get_or_create_endereco(logradouro, numero, cep, bairro_id)
                         db.get_or_create_funcionario(nome_func, endereco_id, id_filial, mt, centro_custo)
+                        with db.conectar() as conn:
+                            cur = conn.cursor()
+                            cur.execute("SELECT cep FROM enderecos WHERE latitude IS NULL OR longitude IS NULL")
+                            ceps_pendentes = [row[0] for row in cur.fetchall()]
+
+                        if not ceps_pendentes:
+                            logging.info("✅ Todos os CEPs já possuem coordenadas.")
+                        else:
+                            logging.info(f"🔍 {len(ceps_pendentes)} CEPs pendentes encontrados.")
+                            for cep in ceps_pendentes:
+                                coords = get_coordinates(cep)
+                                logging.info(f"CEP {cep} atualizado → {coords}")
                         mt_importadas.append(mt)
 
                 if mt_importadas:
